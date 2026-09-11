@@ -1,0 +1,339 @@
+_G.AimbotEnabled = _G.AimbotEnabled or false
+_G.AdvancedESP = _G.AdvancedESP or false
+_G.RegisterESP = _G.RegisterESP or false
+_G.DealerESP = _G.DealerESP or false
+_G.ShowFovCircle = _G.ShowFovCircle or false
+_G.AimRadius = _G.AimRadius or 150
+_G.AimKey = Enum.UserInputType.MouseButton2
+_G.MenuKeyBind = Enum.KeyCode.RightShift
+
+local player = game:GetService("Players").LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+if playerGui:FindFirstChild("PremiumCyberHub") then 
+    playerGui.PremiumCyberHub:Destroy() 
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "PremiumCyberHub"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 480, 0, 270); MainFrame.Position = UDim2.new(0.3, 0, 0.3, 0); MainFrame.BackgroundColor3 = Color3.fromRGB(15, 16, 22); MainFrame.BorderSizePixel = 0; MainFrame.Active = true; MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+
+local NeonLine = Instance.new("Frame", MainFrame)
+NeonLine.Size = UDim2.new(1, 0, 0, 3); NeonLine.BorderSizePixel = 0
+
+local Sidebar = Instance.new("Frame", MainFrame)
+Sidebar.Size = UDim2.new(0, 130, 1, -3); Sidebar.Position = UDim2.new(0, 0, 0, 3); Sidebar.BackgroundColor3 = Color3.fromRGB(10, 11, 15); Sidebar.BorderSizePixel = 0
+Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 12)
+
+local Logo = Instance.new("TextLabel", Sidebar)
+Logo.Size = UDim2.new(1, 0, 0, 40); Logo.BackgroundTransparency = 1; Logo.Text = "  CYBER CORE"; Logo.Font = Enum.Font.GothamBold; Logo.TextSize = 14; Logo.TextXAlignment = Enum.TextXAlignment.Left
+
+task.spawn(function()
+    local speed = 0.05
+    local hue = 0
+    RunService.RenderStepped:Connect(function(dt)
+        hue = (hue + dt * speed) % 1
+        local rainbowColor = Color3.fromHSV(hue, 0.8, 1)
+        NeonLine.BackgroundColor3 = rainbowColor
+        Logo.TextColor3 = rainbowColor
+    end)
+end)
+
+local CoordsLabel = Instance.new("TextLabel", Sidebar)
+CoordsLabel.Size = UDim2.new(1, -10, 0, 45); CoordsLabel.Position = UDim2.new(0, 5, 1, -55); CoordsLabel.BackgroundColor3 = Color3.fromRGB(18, 20, 28); CoordsLabel.BorderSizePixel = 0; CoordsLabel.TextColor3 = Color3.fromRGB(200, 205, 215); CoordsLabel.Font = Enum.Font.Code; CoordsLabel.TextSize = 10; CoordsLabel.Text = "X: 0\nY: 0\nZ: 0"
+Instance.new("UICorner", CoordsLabel).CornerRadius = UDim.new(0, 6)
+
+RunService.RenderStepped:Connect(function()
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local pos = hrp.Position
+        CoordsLabel.Text = string.format("X: %.1f\nY: %.1f\nZ: %.1f", pos.X, pos.Y, pos.Z)
+    else CoordsLabel.Text = "X: -\nY: -\nZ: -" end
+end)
+
+local AimPage = Instance.new("ScrollingFrame", MainFrame)
+AimPage.Size = UDim2.new(1, -145, 1, -15); AimPage.Position = UDim2.new(0, 140, 0, 10); AimPage.BackgroundTransparency = 1; AimPage.BorderSizePixel = 0; AimPage.CanvasSize = UDim2.new(0, 0, 0, 200); AimPage.ScrollBarThickness = 2; AimPage.Visible = true
+
+local VisualsPage = Instance.new("ScrollingFrame", MainFrame)
+VisualsPage.Size = UDim2.new(1, -145, 1, -15); VisualsPage.Position = UDim2.new(0, 140, 0, 10); VisualsPage.BackgroundTransparency = 1; VisualsPage.BorderSizePixel = 0; VisualsPage.CanvasSize = UDim2.new(0, 0, 0, 200); VisualsPage.ScrollBarThickness = 2; VisualsPage.Visible = false
+
+local AimList = Instance.new("UIListLayout", AimPage); AimList.SortOrder = Enum.SortOrder.LayoutOrder; AimList.Padding = UDim.new(0, 8)
+local VisualsList = Instance.new("UIListLayout", VisualsPage); VisualsList.SortOrder = Enum.SortOrder.LayoutOrder; VisualsList.Padding = UDim.new(0, 8)
+
+local function CreateToggle(name, globalVarName, parentPage, callback)
+    local Button = Instance.new("TextButton", parentPage)
+    Button.Size = UDim2.new(1, -10, 0, 35); Button.BackgroundColor3 = Color3.fromRGB(22, 24, 33); Button.Font = Enum.Font.Gotham; Button.TextSize = 13; Button.BorderSizePixel = 0; Button.AutoButtonColor = false
+    Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 6)
+    
+    local function updateVisual()
+        local state = _G[globalVarName]
+        Button.Text = "  " .. name .. (state and " : [ ВКЛ ]" or " : [ ВЫКЛ ]")
+        Button.TextColor3 = state and Color3.fromRGB(0, 255, 170) or Color3.fromRGB(160, 165, 175)
+    end
+    Button.MouseButton1Click:Connect(function()
+        _G[globalVarName] = not _G[globalVarName]
+        updateVisual()
+        if callback then callback(_G[globalVarName]) end
+    end)
+    updateVisual()
+end
+
+local function CreateSlider(name, min, max, default, parentPage, callback)
+    local SliderFrame = Instance.new("Frame", parentPage)
+    SliderFrame.Size = UDim2.new(1, -10, 0, 45); SliderFrame.BackgroundColor3 = Color3.fromRGB(22, 24, 33); SliderFrame.BorderSizePixel = 0
+    Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(0, 6)
+    
+    local SliderLabel = Instance.new("TextLabel", SliderFrame)
+    SliderLabel.Size = UDim2.new(1, -10, 0, 20); SliderLabel.Position = UDim2.new(0, 8, 0, 2); SliderLabel.BackgroundTransparency = 1; SliderLabel.Font = Enum.Font.Gotham; SliderLabel.TextSize = 12; SliderLabel.TextColor3 = Color3.fromRGB(180, 185, 195); SliderLabel.TextXAlignment = Enum.TextXAlignment.Left; SliderLabel.Text = name .. ": " .. default
+    
+    local BarBackground = Instance.new("Frame", SliderFrame)
+    BarBackground.Size = UDim2.new(1, -20, 0, 4); BarBackground.Position = UDim2.new(0, 10, 0, 28); BarBackground.BackgroundColor3 = Color3.fromRGB(35, 38, 50); BarBackground.BorderSizePixel = 0
+    Instance.new("UICorner", BarBackground).CornerRadius = UDim.new(1, 0)
+    
+    local BarMain = Instance.new("Frame", BarBackground)
+    BarMain.Size = UDim2.new((default - min) / (max - min), 0, 1, 0); BarMain.BackgroundColor3 = Color3.fromRGB(0, 255, 170); BarMain.BorderSizePixel = 0
+    Instance.new("UICorner", BarMain).CornerRadius = UDim.new(1, 0)
+    
+    local DragButton = Instance.new("TextButton", BarBackground)
+    DragButton.Size = UDim2.new(0, 10, 0, 10); DragButton.Position = UDim2.new((default - min) / (max - min), -5, 0, -3); DragButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255); DragButton.Text = ""; DragButton.BorderSizePixel = 0
+    Instance.new("UICorner", DragButton).CornerRadius = UDim.new(1, 0)
+    
+    local dragging = false
+    local function updateSlider(input)
+        local relativeX = math.clamp((input.Position.X - BarBackground.AbsolutePosition.X) / BarBackground.AbsoluteSize.X, 0, 1)
+        local value = math.floor(min + relativeX * (max - min))
+        BarMain.Size = UDim2.new(relativeX, 0, 1, 0)
+        DragButton.Position = UDim2.new(relativeX, -5, 0, -3)
+        SliderLabel.Text = name .. ": " .. value
+        callback(value)
+    end
+    
+    DragButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then updateSlider(input) end
+    end)
+end
+
+CreateToggle("Aimbot Master", "AimbotEnabled", AimPage)
+CreateToggle("Show FOV Circle", "ShowFovCircle", AimPage)
+CreateSlider("FOV Radius", 30, 500, _G.AimRadius, AimPage, function(value)
+    _G.AimRadius = value
+end)
+
+CreateToggle("Players ESP (Wallhack)", "AdvancedESP", VisualsPage, function(v)
+    if _G.StartESP_Global then _G.StartESP_Global() end
+end)
+CreateToggle("Registers ESP", "RegisterESP", VisualsPage)
+CreateToggle("Illegal Dealer ESP", "DealerESP", VisualsPage)
+
+local TabContainer = Instance.new("Frame", Sidebar)
+TabContainer.Size = UDim2.new(1, 0, 0, 100); TabContainer.Position = UDim2.new(0, 0, 0, 45); TabContainer.BackgroundTransparency = 1
+
+local AimTabBtn = Instance.new("TextButton", TabContainer)
+AimTabBtn.Size = UDim2.new(1, -10, 0, 30); AimTabBtn.Position = UDim2.new(0, 5, 0, 0); AimTabBtn.BackgroundColor3 = Color3.fromRGB(20, 22, 30); AimTabBtn.Font = Enum.Font.GothamBold; AimTabBtn.TextSize = 12; AimTabBtn.Text = "🎯 AIM"; AimTabBtn.TextColor3 = Color3.fromRGB(0, 255, 170); AimTabBtn.BorderSizePixel = 0
+Instance.new("UICorner", AimTabBtn).CornerRadius = UDim.new(0, 6)
+
+local VisualsTabBtn = Instance.new("TextButton", TabContainer)
+VisualsTabBtn.Size = UDim2.new(1, -10, 0, 30); VisualsTabBtn.Position = UDim2.new(0, 5, 0, 38); VisualsTabBtn.BackgroundColor3 = Color3.fromRGB(15, 16, 22); VisualsTabBtn.Font = Enum.Font.GothamBold; VisualsTabBtn.TextSize = 12; VisualsTabBtn.Text = "👁️ VISUALS"; VisualsTabBtn.TextColor3 = Color3.fromRGB(140, 145, 155); VisualsTabBtn.BorderSizePixel = 0
+Instance.new("UICorner", VisualsTabBtn).CornerRadius = UDim.new(0, 6)
+
+AimTabBtn.MouseButton1Click:Connect(function()
+    AimPage.Visible = true; VisualsPage.Visible = false
+    AimTabBtn.BackgroundColor3 = Color3.fromRGB(20, 22, 30); AimTabBtn.TextColor3 = Color3.fromRGB(0, 255, 170)
+    VisualsTabBtn.BackgroundColor3 = Color3.fromRGB(15, 16, 22); VisualsTabBtn.TextColor3 = Color3.fromRGB(140, 145, 155)
+end)
+
+VisualsTabBtn.MouseButton1Click:Connect(function()
+    AimPage.Visible = false; VisualsPage.Visible = true
+    VisualsTabBtn.BackgroundColor3 = Color3.fromRGB(20, 22, 30); VisualsTabBtn.TextColor3 = Color3.fromRGB(0, 255, 170)
+    AimTabBtn.BackgroundColor3 = Color3.fromRGB(15, 16, 22); AimTabBtn.TextColor3 = Color3.fromRGB(140, 145, 155)
+end)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == _G.MenuKeyBind then MainFrame.Visible = not MainFrame.Visible end
+end)
+local player = game:GetService("Players").LocalPlayer
+local Camera = workspace.CurrentCamera
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local HoldingAim = false
+
+local function drawESP(p)
+    if p == player then return end
+    local safeGui = game:GetService("CoreGui"):FindFirstChild("CyberEspContainer")
+    if not safeGui then
+        safeGui = Instance.new("ScreenGui")
+        safeGui.Name = "CyberEspContainer"
+        safeGui.Parent = game:GetService("CoreGui")
+        safeGui.ResetOnSpawn = false
+    end
+    local infoLabel = Instance.new("TextLabel", safeGui)
+    infoLabel.BackgroundTransparency = 1; infoLabel.TextSize = 12; infoLabel.Font = Enum.Font.Code; infoLabel.TextStrokeTransparency = 0.2; infoLabel.Visible = false
+
+    task.spawn(function()
+        while p and p.Parent and infoLabel.Parent do
+            if _G.AdvancedESP then
+                local char = p.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                if hrp and hum and hum.Health > 0 then
+                    local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                    if onScreen then
+                        local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+                        infoLabel.Position = UDim2.new(0, pos.X - 100, 0, pos.Y - 40); infoLabel.Size = UDim2.new(0, 200, 0, 15)
+                        infoLabel.Text = string.format("%s [%dm] - HP: %d", string.upper(p.Name), math.floor(dist), math.floor(hum.Health))
+                        infoLabel.TextColor3 = hum.Health > 50 and Color3.fromRGB(0, 255, 170) or Color3.fromRGB(255, 60, 60)
+                        infoLabel.Visible = true
+                    else infoLabel.Visible = false end
+                else infoLabel.Visible = false end
+            else
+                infoLabel.Visible = false
+            end
+            task.wait(0.03)
+        end
+        infoLabel:Destroy()
+    end)
+end
+
+_G.StartESP_Global = function()
+    local oldGui = game:GetService("CoreGui"):FindFirstChild("CyberEspContainer")
+    if oldGui then oldGui:Destroy() end
+    if _G.AdvancedESP then
+        for _, p in pairs(game:GetService("Players"):GetPlayers()) do drawESP(p) end
+    end
+end
+
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if _G.AdvancedESP then _G.StartESP_Global() end
+end)
+game:GetService("Players").PlayerAdded:Connect(function(p) drawESP(p) end)
+
+local function applyObjectHighlight(obj, color, name, checkGlobalBool)
+    if obj:FindFirstChild("CyberObjectESP") then return end
+    
+    local Highlight = Instance.new("Highlight")
+    Highlight.Name = "CyberObjectESP"
+    Highlight.FillColor = color
+    Highlight.FillTransparency = 0.4
+    Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    Highlight.OutlineTransparency = 0.1
+    Highlight.Adornee = obj
+    Highlight.Parent = obj
+
+    local Billboard = Instance.new("BillboardGui", obj)
+    Billboard.Name = "CyberObjectText"
+    Billboard.Size = UDim2.new(0, 160, 0, 30)
+    Billboard.AlwaysOnTop = true
+    Billboard.StudsOffset = Vector3.new(0, 2, 0)
+    
+    local TextLabel = Instance.new("TextLabel", Billboard)
+    TextLabel.Size = UDim2.new(1, 0, 1, 0)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.TextColor3 = color
+    TextLabel.TextStrokeTransparency = 0
+    TextLabel.TextSize = 11
+    TextLabel.Font = Enum.Font.GothamBold
+    
+    task.spawn(function()
+        while obj and obj.Parent and Highlight.Parent do
+            if _G[checkGlobalBool] then
+                Highlight.Enabled = true
+                Billboard.Enabled = true
+                local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local targetPos = obj:IsA("Model") and (obj.PrimaryPart and obj.PrimaryPart.Position or obj:FindFirstChildOfClass("BasePart").Position) or obj.Position
+                    local dist = (hrp.Position - targetPos).Magnitude
+                    TextLabel.Text = string.format("%s [%dm]", name, math.floor(dist))
+                end
+            else
+                Highlight.Enabled = false
+                Billboard.Enabled = false
+            end
+            task.wait(0.5)
+        end
+        Highlight:Destroy()
+        Billboard:Destroy()
+    end)
+end
+
+task.spawn(function()
+    while true do
+        local map = workspace:FindFirstChild("Map")
+        local shopz = map and map:FindFirstChild("Shopz")
+        local dealer = shopz and shopz:FindFirstChild("Dealer")
+        local mainPart = dealer and dealer:FindFirstChild("MainPart")
+        
+        if mainPart and mainPart:IsA("BasePart") then
+            applyObjectHighlight(mainPart, Color3.fromRGB(255, 0, 0), "ILLEGAL DEALER", "DealerESP")
+        end
+        
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj.Name:find("Register") and not obj.Name:find("Pick") and not obj.Name:find("Cash") then
+                if obj:IsA("BasePart") or obj:IsA("Model") then
+                    applyObjectHighlight(obj, Color3.fromRGB(0, 255, 120), "CASH REGISTER", "RegisterESP")
+                end
+            end
+        end
+        task.wait(4)
+    end
+end)
+
+local playerGui = player:WaitForChild("PlayerGui")
+local FovContainer = playerGui:FindFirstChild("FovContainer") or Instance.new("ScreenGui", playerGui)
+FovContainer.Name = "FovContainer"; FovContainer.ResetOnSpawn = false
+local FovCircle = FovContainer:FindFirstChild("FovCircle") or Instance.new("Frame", FovContainer)
+FovCircle.Name = "FovCircle"; FovCircle.BackgroundTransparency = 1; FovCircle.AnchorPoint = Vector2.new(0.5, 0.5); FovCircle.Visible = false
+local Corner = FovCircle:FindFirstChild("UICorner") or Instance.new("UICorner", FovCircle); Corner.CornerRadius = UDim.new(1, 0)
+local Stroke = FovCircle:FindFirstChild("UIStroke") or Instance.new("UIStroke", FovCircle); Stroke.Thickness = 1.5; Stroke.Color = Color3.fromRGB(0, 255, 170); Stroke.Transparency = 0.4
+
+RunService.RenderStepped:Connect(function()
+    if _G.AimbotEnabled and _G.ShowFovCircle then
+        local mousePos = UserInputService:GetMouseLocation()
+        FovCircle.Position = UDim2.new(0, mousePos.X, 0, mousePos.Y)
+        FovCircle.Size = UDim2.new(0, _G.AimRadius * 2, 0, _G.AimRadius * 2)
+        FovCircle.Visible = true
+    else FovCircle.Visible = false end
+end)
+
+local function getClosestPlayer()
+    local closest, shortest = nil, math.huge
+    for _, p in pairs(game:GetService("Players"):GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                    if dist < shortest and dist < _G.AimRadius then shortest = dist; closest = p end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+RunService.RenderStepped:Connect(function()
+    if _G.AimbotEnabled and HoldingAim then
+        local target = getClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(i, p) if not p and i.UserInputType == _G.AimKey then HoldingAim = true end end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == _G.AimKey then HoldingAim = false end end)
+
+if _G.AdvancedESP then _G.StartESP_Global() end
